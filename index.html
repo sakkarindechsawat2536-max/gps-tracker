@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta name="theme-color" content="#060c18"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="GPS Tracker"/>
+<title>GPS Tracker — Daily Location Logger</title>
+<link rel="manifest" href="manifest.json"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#060c18;--bg2:#0a1628;--bg3:#0d1e35;
+  --cyan:#00D4FF;--cyan2:#0066ff;--purple:#a78bfa;--green:#34d399;--red:#f87171;--amber:#fbbf24;
+  --text:#e2e8f0;--text2:#94a3b8;--text3:#475569;--text4:#334155;
+  --border:rgba(255,255,255,0.07);--border-cyan:rgba(0,212,255,0.18);
+  --card:rgba(255,255,255,0.03);--card-active:rgba(0,212,255,0.06);
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'Inter',sans-serif;color:var(--text)}
+body{display:flex;flex-direction:column}
+
+/* Layout */
+#app{flex:1;display:flex;flex-direction:column;height:100%;overflow:hidden}
+#header{flex-shrink:0;background:rgba(6,12,24,0.92);border-bottom:1px solid var(--border-cyan);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);z-index:100}
+#main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 14px 90px}
+#nav{flex-shrink:0;position:fixed;bottom:0;left:0;right:0;background:rgba(6,12,24,0.96);border-top:1px solid var(--border);display:flex;padding:8px 0 max(8px,env(safe-area-inset-bottom));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);z-index:100}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 4px;border:none;background:none;color:var(--text3);cursor:pointer;transition:color 0.2s;font-family:'Inter',sans-serif}
+.nav-btn.active{color:var(--cyan)}
+.nav-btn .icon{font-size:22px;line-height:1}
+.nav-btn .label{font-size:10px;font-weight:500;letter-spacing:0.3px}
+
+/* Header */
+#logo{display:flex;align-items:center;gap:10px}
+#logo-icon{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),var(--cyan2));display:flex;align-items:center;justify-content:center;font-size:18px;animation:glowPulse 3s infinite;flex-shrink:0}
+#logo-text{font-size:16px;font-weight:800;color:var(--cyan);letter-spacing:0.3px}
+#logo-sub{font-size:9px;color:var(--text4);letter-spacing:2px;text-transform:uppercase}
+#live-badge{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600}
+#live-dot{width:7px;height:7px;border-radius:50%;background:var(--text4);transition:all 0.3s;flex-shrink:0}
+#live-dot.active{background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 1.5s infinite}
+#live-label{color:var(--text4);transition:color 0.3s}
+#live-label.active{color:var(--green)}
+
+/* Cards */
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px}
+.card-active{background:var(--card-active);border-color:var(--border-cyan)}
+
+/* Stats */
+#stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 8px;text-align:center}
+.stat-val{font-size:22px;font-weight:800;line-height:1}
+.stat-unit{font-size:11px;color:var(--text3);margin-left:2px}
+.stat-lbl{font-size:10px;color:var(--text3);margin-top:4px}
+
+/* GPS Control */
+#gps-control{margin-bottom:14px}
+#gps-btn{width:100%;padding:16px;border:none;border-radius:16px;font-size:16px;font-weight:700;cursor:pointer;transition:all 0.25s;font-family:'Inter',sans-serif;letter-spacing:0.3px;display:flex;align-items:center;justify-content:center;gap:8px}
+#gps-btn.start{background:linear-gradient(135deg,var(--cyan),var(--cyan2));color:#fff;box-shadow:0 4px 20px rgba(0,212,255,0.25)}
+#gps-btn.stop{background:linear-gradient(135deg,#ff4757,#c0392b);color:#fff;box-shadow:0 4px 20px rgba(255,71,87,0.25)}
+#gps-btn:active{transform:scale(0.98)}
+#gps-status{margin-top:10px;font-size:13px;color:var(--text3);display:flex;align-items:center;gap:6px;justify-content:center;min-height:20px}
+#gps-accuracy{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text4)}
+
+/* Timeline */
+#timeline-wrap{position:relative}
+#timeline-line{position:absolute;left:27px;top:20px;bottom:20px;width:2px;background:linear-gradient(to bottom,rgba(0,212,255,0.4),rgba(0,102,255,0.05));z-index:0}
+#timeline{display:flex;flex-direction:column;gap:10px}
+.tl-item{display:flex;align-items:flex-start;gap:12px;position:relative;animation:fadeUp 0.4s ease forwards}
+.tl-dot-wrap{width:56px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:3px;z-index:1}
+.tl-dot{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:19px;border:2px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);transition:all 0.3s;flex-shrink:0}
+.tl-dot.latest{background:linear-gradient(135deg,var(--cyan),var(--cyan2));border-color:var(--cyan);box-shadow:0 0 14px rgba(0,212,255,0.4)}
+.tl-time{font-size:9px;color:var(--text4);font-family:'JetBrains Mono',monospace;text-align:center;line-height:1.3}
+.tl-card{flex:1;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 14px;min-width:0;position:relative;transition:all 0.3s}
+.tl-card.latest{background:var(--card-active);border-color:var(--border-cyan)}
+.tl-name{font-weight:700;font-size:14px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:3px}
+.tl-card.latest .tl-name{color:var(--cyan)}
+.tl-area{font-size:11px;color:var(--text3);margin-bottom:4px}
+.tl-note{display:inline-block;font-size:11px;color:var(--purple);background:rgba(167,139,250,0.1);border-radius:6px;padding:2px 8px;margin-bottom:6px}
+.tl-duration{display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--amber);background:rgba(251,191,36,0.08);border-radius:6px;padding:2px 7px;margin-bottom:6px;margin-left:4px}
+.tl-meta{display:flex;align-items:center;justify-content:space-between;margin-top:4px}
+.tl-coords{font-size:9px;color:var(--text4);font-family:'JetBrains Mono',monospace}
+.tl-actions{display:flex;gap:6px;align-items:center}
+.tl-map-btn{font-size:14px;text-decoration:none;opacity:0.55;transition:opacity 0.2s;line-height:1}
+.tl-map-btn:hover{opacity:1}
+.tl-del-btn{background:rgba(248,113,113,0.12);border:none;border-radius:6px;color:var(--red);cursor:pointer;font-size:11px;padding:2px 7px;opacity:0.6;transition:opacity 0.2s;line-height:1.6}
+.tl-del-btn:hover{opacity:1}
+.tl-badge-latest{font-size:8px;background:rgba(0,212,255,0.15);color:var(--cyan);padding:2px 6px;border-radius:10px;vertical-align:middle;margin-left:6px;letter-spacing:0.5px}
+
+/* Photo */
+.tl-photo{width:100%;border-radius:8px;margin-top:8px;max-height:140px;object-fit:cover;display:block}
+
+/* Map Tab */
+#map-container{border-radius:16px;overflow:hidden;height:calc(100vh - 200px);background:var(--bg3);border:1px solid var(--border);position:relative}
+#map-iframe{width:100%;height:100%;border:none}
+#map-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text3)}
+#map-placeholder .big-icon{font-size:48px;opacity:0.3}
+
+/* History Tab */
+.day-group{margin-bottom:20px}
+.day-header{font-size:11px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;padding:8px 0;border-bottom:1px solid var(--border);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+.day-stat{font-size:10px;color:var(--text4);background:var(--card);border-radius:6px;padding:2px 8px}
+
+/* Stats Tab */
+.chart-bar-wrap{display:flex;flex-direction:column;gap:8px}
+.chart-bar-row{display:flex;align-items:center;gap:10px}
+.chart-bar-label{font-size:12px;color:var(--text2);width:120px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chart-bar-track{flex:1;height:22px;background:rgba(255,255,255,0.04);border-radius:6px;overflow:hidden;position:relative}
+.chart-bar-fill{height:100%;border-radius:6px;transition:width 0.8s cubic-bezier(0.4,0,0.2,1);display:flex;align-items:center;justify-content:flex-end;padding-right:8px}
+.chart-bar-val{font-size:10px;font-weight:700;color:#fff;white-space:nowrap}
+
+/* Empty */
+.empty{text-align:center;padding:50px 20px}
+.empty-icon{font-size:52px;opacity:0.2;margin-bottom:14px}
+.empty-title{font-size:16px;color:var(--text4);margin-bottom:6px}
+.empty-sub{font-size:13px;color:var(--text4)}
+
+/* Buttons */
+.btn{border:none;border-radius:12px;cursor:pointer;font-family:'Inter',sans-serif;transition:all 0.2s;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn:active{transform:scale(0.97)}
+.btn-primary{background:linear-gradient(135deg,var(--cyan),var(--cyan2));color:#fff;font-weight:700}
+.btn-ghost{background:var(--card);border:1px solid var(--border);color:var(--text2)}
+.btn-danger{background:rgba(248,113,113,0.12);border:1px solid rgba(248,113,113,0.2);color:var(--red)}
+.btn-green{background:linear-gradient(135deg,#00c853,#007c3a);color:#fff;font-weight:700}
+.btn-purple{background:rgba(167,139,250,0.12);border:1px solid rgba(167,139,250,0.2);color:var(--purple)}
+
+/* Input */
+.input{background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:12px;padding:11px 14px;color:var(--text);font-size:14px;font-family:'Inter',sans-serif;width:100%;transition:all 0.2s;outline:none}
+.input:focus{border-color:rgba(0,212,255,0.45);box-shadow:0 0 0 3px rgba(0,212,255,0.08)}
+.input::placeholder{color:var(--text4)}
+
+/* Section title */
+.sec-title{font-size:11px;color:var(--text3);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.sec-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* Toast */
+#toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:rgba(20,30,50,0.95);border:1px solid var(--border-cyan);border-radius:30px;padding:10px 20px;font-size:13px;color:var(--text);white-space:nowrap;opacity:0;transition:all 0.3s;z-index:999;pointer-events:none;backdrop-filter:blur(12px)}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* Spinner */
+.spin{animation:spin 0.9s linear infinite;display:inline-block}
+
+/* Animations */
+@keyframes glowPulse{0%,100%{box-shadow:0 0 12px rgba(0,212,255,0.3)}50%{box-shadow:0 0 24px rgba(0,212,255,0.6)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+
+/* Section panels */
+.panel{display:none}
+.panel.active{display:block}
+
+/* Quick note chips */
+.chip-wrap{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.chip{padding:5px 12px;background:var(--card);border:1px solid var(--border);border-radius:20px;color:var(--text2);font-size:12px;cursor:pointer;transition:all 0.2s;font-family:'Inter',sans-serif}
+.chip:active{background:rgba(0,212,255,0.1);border-color:var(--border-cyan)}
+
+/* Photo preview */
+#photo-preview{width:100%;height:100px;object-fit:cover;border-radius:10px;display:none;margin-top:8px}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- Header -->
+<div id="header">
+  <div id="logo">
+    <div id="logo-icon">🛰️</div>
+    <div>
+      <div id="logo-text">GPS Tracker</div>
+      <div id="logo-sub">Daily Location Logger</div>
+    </div>
+  </div>
+  <div id="live-badge">
+    <div id="live-dot"></div>
+    <span id="live-label">OFF</span>
+  </div>
+</div>
+
+<!-- Main content -->
+<div id="main">
+
+  <!-- TODAY TAB -->
+  <div id="panel-today" class="panel active">
+    <div id="stats">
+      <div class="stat"><div class="stat-val" id="st-points" style="color:#00D4FF">0<span class="stat-unit">จุด</span></div><div class="stat-lbl">บันทึกแล้ว</div></div>
+      <div class="stat"><div class="stat-val" id="st-places" style="color:#a78bfa">0<span class="stat-unit">แห่ง</span></div><div class="stat-lbl">ไม่ซ้ำ</div></div>
+      <div class="stat"><div class="stat-val" id="st-dist" style="color:#34d399">0<span class="stat-unit">ม.</span></div><div class="stat-lbl">ระยะทาง</div></div>
+    </div>
+
+    <!-- GPS Button -->
+    <div id="gps-control" class="card">
+      <button id="gps-btn" class="start" onclick="toggleTracking()">
+        <span id="gps-btn-icon">🛰️</span>
+        <span id="gps-btn-text">เริ่มติดตาม GPS อัตโนมัติ</span>
+      </button>
+      <div id="gps-status">
+        <span id="gps-status-text">กดเพื่อเริ่มบันทึกตำแหน่งอัตโนมัติ</span>
+      </div>
+
+      <!-- Note & Photo -->
+      <div id="gps-extras" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+        <input class="input" id="note-input" placeholder="หมายเหตุ เช่น ประชุม, กินข้าว..." style="margin-bottom:8px"/>
+        <div class="chip-wrap" id="quick-chips">
+          <button class="chip" onclick="setNote('ประชุม')">📋 ประชุม</button>
+          <button class="chip" onclick="setNote('กินข้าวกลางวัน')">🍽️ กินข้าวกลางวัน</button>
+          <button class="chip" onclick="setNote('กาแฟเช้า')">☕ กาแฟเช้า</button>
+          <button class="chip" onclick="setNote('ซื้อของ')">🛍️ ซื้อของ</button>
+          <button class="chip" onclick="setNote('ออกกำลังกาย')">💪 ออกกำลังกาย</button>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" style="flex:1;padding:11px" onclick="manualCapture()">
+            📍 บันทึกตำแหน่งนี้
+          </button>
+          <label class="btn btn-ghost" style="padding:11px 14px;cursor:pointer">
+            📸<input type="file" accept="image/*" capture="environment" style="display:none" onchange="handlePhoto(this)"/>
+          </label>
+        </div>
+        <img id="photo-preview"/>
+      </div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="sec-title">📍 เส้นทางวันนี้</div>
+    <div id="today-empty" class="empty">
+      <div class="empty-icon">🗺️</div>
+      <div class="empty-title">ยังไม่มีข้อมูลการเดินทาง</div>
+      <div class="empty-sub">กด "เริ่มติดตาม GPS" เพื่อบันทึกอัตโนมัติ</div>
+    </div>
+    <div id="timeline-wrap" style="display:none">
+      <div id="timeline-line"></div>
+      <div id="timeline"></div>
+    </div>
+  </div>
+
+  <!-- MAP TAB -->
+  <div id="panel-map" class="panel">
+    <div class="sec-title">🗺️ แผนที่เส้นทาง</div>
+    <div id="map-container">
+      <div id="map-placeholder">
+        <div class="big-icon">🗺️</div>
+        <div style="font-size:14px">บันทึกตำแหน่งแล้วแผนที่จะแสดงที่นี่</div>
+      </div>
+      <iframe id="map-iframe" style="display:none"></iframe>
+    </div>
+  </div>
+
+  <!-- HISTORY TAB -->
+  <div id="panel-history" class="panel">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div class="sec-title" style="margin-bottom:0">📅 ประวัติย้อนหลัง</div>
+      <button class="btn btn-danger" style="padding:6px 12px;font-size:12px" onclick="clearAllHistory()">🗑️ ล้างทั้งหมด</button>
+    </div>
+    <div id="history-empty" class="empty">
+      <div class="empty-icon">📅</div>
+      <div class="empty-title">ยังไม่มีประวัติ</div>
+      <div class="empty-sub">บันทึกสถานที่แล้วจะเก็บไว้ที่นี่</div>
+    </div>
+    <div id="history-content"></div>
+  </div>
+
+  <!-- EXPORT TAB -->
+  <div id="panel-export" class="panel">
+    <div class="sec-title">📊 ส่งออกข้อมูล</div>
+    <div class="card" style="margin-bottom:12px">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.6">เลือกช่วงเวลาที่ต้องการส่งออก</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn btn-green" style="padding:13px;font-size:15px;width:100%" onclick="exportExcel('today')">📊 ส่งออกวันนี้ (Excel)</button>
+        <button class="btn btn-green" style="padding:13px;font-size:15px;width:100%;opacity:0.85" onclick="exportExcel('week')">📊 ส่งออก 7 วันล่าสุด</button>
+        <button class="btn btn-green" style="padding:13px;font-size:15px;width:100%;opacity:0.7" onclick="exportExcel('all')">📊 ส่งออกทั้งหมด</button>
+      </div>
+    </div>
+    <div class="card">
+      <div style="font-size:12px;color:var(--text3);margin-bottom:10px;letter-spacing:0.5px">ℹ️ ข้อมูลที่ส่งออก</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="font-size:13px;color:var(--text2)">• เวลาและวันที่บันทึก</div>
+        <div style="font-size:13px;color:var(--text2)">• ชื่อสถานที่และย่าน</div>
+        <div style="font-size:13px;color:var(--text2)">• พิกัด Latitude / Longitude</div>
+        <div style="font-size:13px;color:var(--text2)">• ระยะเวลาอยู่แต่ละสถานที่</div>
+        <div style="font-size:13px;color:var(--text2)">• หมายเหตุ</div>
+        <div style="font-size:13px;color:var(--text2)">• ลิงก์ Google Maps</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- Bottom Nav -->
+<nav id="nav">
+  <button class="nav-btn active" onclick="switchTab('today',this)"><span class="icon">📍</span><span class="label">วันนี้</span></button>
+  <button class="nav-btn" onclick="switchTab('map',this)"><span class="icon">🗺️</span><span class="label">แผนที่</span></button>
+  <button class="nav-btn" onclick="switchTab('history',this)"><span class="icon">📅</span><span class="label">ประวัติ</span></button>
+  <button class="nav-btn" onclick="switchTab('export',this)"><span class="icon">📊</span><span class="label">ส่งออก</span></button>
+</nav>
+
+</div><!-- /app -->
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+// ─────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────
+const DB_KEY = 'gps_tracker_v2';
+let state = {
+  tracking: false,
+  watchId: null,
+  locations: [],       // today's logs
+  lastPos: null,
+  pendingNote: '',
+  pendingPhoto: null,  // base64
+  lastGeoHash: null,
+};
+const MIN_DIST_M = 80;
+const MIN_TIME_MS = 3 * 60 * 1000; // 3 minutes between auto-saves
+
+// ─────────────────────────────────────────
+// STORAGE
+// ─────────────────────────────────────────
+function loadStorage() {
+  try {
+    const raw = localStorage.getItem(DB_KEY);
+    return raw ? JSON.parse(raw) : { history: {} };
+  } catch { return { history: {} }; }
+}
+function saveStorage(data) {
+  try { localStorage.setItem(DB_KEY, JSON.stringify(data)); } catch(e) { showToast('⚠️ พื้นที่เก็บข้อมูลเต็ม'); }
+}
+function todayKey() {
+  return new Date().toISOString().slice(0,10);
+}
+function saveToday() {
+  const db = loadStorage();
+  db.history = db.history || {};
+  db.history[todayKey()] = state.locations;
+  saveStorage(db);
+}
+function loadToday() {
+  const db = loadStorage();
+  const key = todayKey();
+  state.locations = (db.history && db.history[key]) ? db.history[key] : [];
+}
+
+// ─────────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────────
+function haversine(lat1,lon1,lat2,lon2){
+  const R=6371000,dL=((lat2-lat1)*Math.PI)/180,dO=((lon2-lon1)*Math.PI)/180;
+  const a=Math.sin(dL/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dO/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function fmtTime(d){ return new Date(d).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}); }
+function fmtDate(d){ return new Date(d).toLocaleDateString('th-TH',{weekday:'long',year:'numeric',month:'long',day:'numeric'}); }
+function fmtDateShort(d){ return new Date(d).toLocaleDateString('th-TH',{weekday:'short',day:'numeric',month:'short'}); }
+function fmtDist(m){ return m>=1000 ? (m/1000).toFixed(1)+'กม.' : Math.round(m)+'ม.'; }
+function fmtDuration(ms){
+  const s=Math.floor(ms/1000),mi=Math.floor(s/60),h=Math.floor(mi/60);
+  if(h>0) return `${h}ชม.${mi%60}น.`;
+  if(mi>0) return `${mi}น.`;
+  return `${s}วิ`;
+}
+
+function placeIcon(name=''){
+  const n=name.toLowerCase();
+  if(/ร้านอาหาร|restaurant|food|kitchen|ข้าว|อาหาร|ก๋วยเตี๋ยว|หมูกระทะ|ชาบู/.test(n)) return '🍽️';
+  if(/cafe|coffee|คาเฟ่|กาแฟ|สตาร์บัค|amazon|doi/.test(n)) return '☕';
+  if(/hospital|clinic|โรงพยาบาล|คลินิก|หมอ|ฟัน|นวด/.test(n)) return '🏥';
+  if(/school|university|โรงเรียน|มหาวิทยาลัย|วิทยาลัย/.test(n)) return '🏫';
+  if(/park|สวน|garden|สนาม/.test(n)) return '🌳';
+  if(/office|สำนักงาน|building|tower|ตึก/.test(n)) return '🏢';
+  if(/home|บ้าน|house|คอนโด|หอพัก/.test(n)) return '🏠';
+  if(/hotel|โรงแรม|resort|รีสอร์ท/.test(n)) return '🏨';
+  if(/gas|ปั๊ม|petrol|น้ำมัน/.test(n)) return '⛽';
+  if(/bank|ธนาคาร|atm|กสิกร|กรุงไทย|ไทยพาณิชย์/.test(n)) return '🏦';
+  if(/gym|fitness|sport|ฟิตเนส/.test(n)) return '💪';
+  if(/temple|วัด|church|mosque|มัสยิด/.test(n)) return '⛩️';
+  if(/market|mall|ตลาด|plaza|ห้าง|central|the mall|terminal/.test(n)) return '🛒';
+  if(/airport|สนามบิน|สุวรรณภูมิ|ดอนเมือง/.test(n)) return '✈️';
+  if(/station|bts|mrt|สถานี|รถไฟ/.test(n)) return '🚇';
+  if(/beach|หาด|ทะเล/.test(n)) return '🏖️';
+  if(/shop|store|ร้าน|7-eleven|เซเว่น/.test(n)) return '🛍️';
+  return '📍';
+}
+
+async function reverseGeocode(lat,lon){
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=th,en`);
+    const d = await r.json();
+    const a = d.address||{};
+    const name = a.amenity||a.shop||a.building||a.tourism||a.leisure||a.office||a.road||a.suburb||a.neighbourhood||(d.display_name||'').split(',')[0]||'สถานที่ไม่ทราบ';
+    const area = [a.suburb||a.neighbourhood, a.city||a.town||a.village].filter(Boolean).join(', ');
+    return { name, area, full: d.display_name||`${lat},${lon}` };
+  } catch { return { name:'ไม่สามารถระบุสถานที่', area:'', full:`${lat},${lon}` }; }
+}
+
+function totalDist(){
+  if(state.locations.length<2) return 0;
+  let d=0;
+  for(let i=1;i<state.locations.length;i++){
+    const a=state.locations[i-1], b=state.locations[i];
+    d+=haversine(a.lat,a.lon,b.lat,b.lon);
+  }
+  return d;
+}
+
+function showToast(msg, dur=2500){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(t._t);
+  t._t=setTimeout(()=>t.classList.remove('show'), dur);
+}
+
+// ─────────────────────────────────────────
+// GPS TRACKING
+// ─────────────────────────────────────────
+function toggleTracking(){
+  if(state.tracking) stopTracking(); else startTracking();
+}
+
+function startTracking(){
+  if(!navigator.geolocation){ showToast('❌ เบราว์เซอร์ไม่รองรับ GPS'); return; }
+  state.tracking=true;
+  state.lastAutoSave=0;
+  updateLiveBadge();
+  updateGpsBtn();
+  document.getElementById('gps-extras').style.display='block';
+  setGpsStatus('🛰️ กำลังหาสัญญาณ GPS...');
+
+  state.watchId = navigator.geolocation.watchPosition(
+    onGpsSuccess,
+    onGpsError,
+    { enableHighAccuracy:true, maximumAge:15000, timeout:20000 }
+  );
+  showToast('🛰️ เริ่มติดตาม GPS แล้ว');
+}
+
+function stopTracking(){
+  if(state.watchId!=null){ navigator.geolocation.clearWatch(state.watchId); state.watchId=null; }
+  state.tracking=false;
+  updateLiveBadge();
+  updateGpsBtn();
+  setGpsStatus('หยุดติดตามแล้ว — กด "เริ่ม" เพื่อติดตามต่อ');
+  showToast('⏹️ หยุดติดตามแล้ว');
+}
+
+let lastAutoTime = 0;
+let lastAutoLat = null, lastAutoLon = null;
+
+async function onGpsSuccess(pos){
+  const { latitude:lat, longitude:lon, accuracy } = pos.coords;
+  state.lastPos = { lat, lon, accuracy };
+  setGpsStatus(`📡 สัญญาณดี | ±${Math.round(accuracy)}ม.`);
+
+  const now = Date.now();
+  let shouldSave = false;
+
+  if(lastAutoLat===null){
+    shouldSave = true;
+  } else {
+    const dist = haversine(lastAutoLat, lastAutoLon, lat, lon);
+    const timeDiff = now - lastAutoTime;
+    if(dist >= MIN_DIST_M && timeDiff >= MIN_TIME_MS) shouldSave = true;
+  }
+
+  if(shouldSave){
+    lastAutoLat = lat; lastAutoLon = lon; lastAutoTime = now;
+    await captureLocation(lat, lon, accuracy, '', null, true);
+  }
+}
+
+function onGpsError(err){
+  const msgs = { 1:'❌ ไม่ได้รับอนุญาต GPS — กรุณาอนุญาตใน Settings', 2:'⚠️ ไม่พบสัญญาณ GPS', 3:'⏱️ GPS timeout — กำลังลองใหม่...' };
+  setGpsStatus(msgs[err.code]||'⚠️ GPS Error');
+  if(err.code===1){ stopTracking(); }
+}
+
+async function manualCapture(){
+  if(!state.lastPos){ showToast('⚠️ ยังไม่มีสัญญาณ GPS'); return; }
+  const note = document.getElementById('note-input').value;
+  const photo = state.pendingPhoto;
+  await captureLocation(state.lastPos.lat, state.lastPos.lon, state.lastPos.accuracy, note, photo, false);
+  document.getElementById('note-input').value='';
+  state.pendingPhoto=null;
+  document.getElementById('photo-preview').style.display='none';
+  showToast('✅ บันทึกตำแหน่งแล้ว');
+}
+
+async function captureLocation(lat, lon, accuracy, note, photo, isAuto){
+  setGpsStatus(`${isAuto?'🔄':'📍'} กำลังระบุสถานที่...`);
+  const place = await reverseGeocode(lat, lon);
+  const now = new Date();
+
+  // compute duration from previous entry
+  let duration = null;
+  if(state.locations.length > 0){
+    const prev = state.locations[state.locations.length-1];
+    duration = now.getTime() - new Date(prev.time).getTime();
+  }
+
+  const entry = {
+    id: Date.now(),
+    lat, lon, accuracy,
+    time: now.toISOString(),
+    place: place.name,
+    area: place.area,
+    fullAddress: place.full,
+    icon: placeIcon(place.name+' '+place.area),
+    note: note||'',
+    photo: photo||null,
+    isAuto,
+    duration,
+  };
+
+  state.locations.push(entry);
+  saveToday();
+  renderTimeline();
+  updateStats();
+  if(!isAuto) setGpsStatus(`📡 สัญญาณดี | ±${Math.round(accuracy||0)}ม.`);
+  else setGpsStatus(`✅ บันทึกอัตโนมัติ ${fmtTime(now)} | ±${Math.round(accuracy||0)}ม.`);
+}
+
+// ─────────────────────────────────────────
+// RENDER
+// ─────────────────────────────────────────
+function renderTimeline(){
+  const locs = [...state.locations].reverse();
+  const el = document.getElementById('timeline');
+  const empty = document.getElementById('today-empty');
+  const wrap = document.getElementById('timeline-wrap');
+
+  if(locs.length===0){ empty.style.display='block'; wrap.style.display='none'; return; }
+  empty.style.display='none'; wrap.style.display='block';
+
+  el.innerHTML = locs.map((loc,i) => `
+    <div class="tl-item">
+      <div class="tl-dot-wrap">
+        <div class="tl-dot ${i===0?'latest':''}">${loc.icon}</div>
+        <div class="tl-time">${fmtTime(loc.time)}</div>
+      </div>
+      <div class="tl-card ${i===0?'latest':''}">
+        <div class="tl-name">${loc.place}${i===0?'<span class="tl-badge-latest">ล่าสุด</span>':''}</div>
+        ${loc.area?`<div class="tl-area">📌 ${loc.area}</div>`:''}
+        ${loc.note?`<span class="tl-note">💬 ${loc.note}</span>`:''}
+        ${loc.duration!=null?`<span class="tl-duration">⏱️ ${fmtDuration(loc.duration)}</span>`:''}
+        ${loc.photo?`<img class="tl-photo" src="${loc.photo}" loading="lazy"/>`:''}
+        <div class="tl-meta">
+          <div class="tl-coords">${loc.lat.toFixed(5)}, ${loc.lon.toFixed(5)}</div>
+          <div class="tl-actions">
+            <a class="tl-map-btn" href="https://maps.google.com/?q=${loc.lat},${loc.lon}" target="_blank" title="Google Maps">🗺️</a>
+            <button class="tl-del-btn" onclick="deleteEntry(${loc.id})">✕</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function updateStats(){
+  const locs = state.locations;
+  const dist = totalDist();
+  document.getElementById('st-points').innerHTML = `${locs.length}<span class="stat-unit">จุด</span>`;
+  document.getElementById('st-places').innerHTML = `${new Set(locs.map(l=>l.place)).size}<span class="stat-unit">แห่ง</span>`;
+  const d = dist>=1000 ? (dist/1000).toFixed(1) : Math.round(dist);
+  const u = dist>=1000?'กม.':'ม.';
+  document.getElementById('st-dist').innerHTML = `${d}<span class="stat-unit">${u}</span>`;
+}
+
+function updateLiveBadge(){
+  const dot = document.getElementById('live-dot');
+  const lbl = document.getElementById('live-label');
+  dot.className = state.tracking ? 'active' : '';
+  lbl.className = state.tracking ? 'active' : '';
+  lbl.textContent = state.tracking ? 'LIVE' : 'OFF';
+}
+
+function updateGpsBtn(){
+  const btn = document.getElementById('gps-btn');
+  const icon = document.getElementById('gps-btn-icon');
+  const txt = document.getElementById('gps-btn-text');
+  if(state.tracking){
+    btn.className='stop'; icon.textContent='⏹️'; txt.textContent='หยุดติดตาม GPS';
+  } else {
+    btn.className='start'; icon.textContent='🛰️'; txt.textContent='เริ่มติดตาม GPS อัตโนมัติ';
+  }
+}
+
+function setGpsStatus(msg){
+  document.getElementById('gps-status-text').innerHTML = msg;
+}
+
+function deleteEntry(id){
+  state.locations = state.locations.filter(l=>l.id!==id);
+  saveToday();
+  renderTimeline();
+  updateStats();
+  showToast('🗑️ ลบแล้ว');
+}
+
+// ─────────────────────────────────────────
+// MAP TAB
+// ─────────────────────────────────────────
+function renderMap(){
+  const locs = state.locations;
+  const placeholder = document.getElementById('map-placeholder');
+  const iframe = document.getElementById('map-iframe');
+  if(locs.length===0){ placeholder.style.display='flex'; iframe.style.display='none'; return; }
+  placeholder.style.display='none'; iframe.style.display='block';
+
+  // Build OpenStreetMap URL with markers
+  const last = locs[locs.length-1];
+  const markers = locs.map(l=>`${l.lat},${l.lon}`).join('|');
+  const url = `https://www.openstreetmap.org/export/embed.html?bbox=${last.lon-0.02},${last.lat-0.02},${last.lon+0.02},${last.lat+0.02}&layer=mapnik&marker=${last.lat},${last.lon}`;
+  iframe.src = url;
+}
+
+// ─────────────────────────────────────────
+// HISTORY TAB
+// ─────────────────────────────────────────
+function renderHistory(){
+  const db = loadStorage();
+  const history = db.history||{};
+  const keys = Object.keys(history).sort().reverse();
+  const content = document.getElementById('history-content');
+  const empty = document.getElementById('history-empty');
+
+  if(keys.length===0){ empty.style.display='block'; content.innerHTML=''; return; }
+  empty.style.display='none';
+
+  content.innerHTML = keys.map(key => {
+    const locs = history[key];
+    if(!locs||!locs.length) return '';
+    const dist = calcDistForLocs(locs);
+    const dateStr = fmtDateShort(key+'T00:00:00');
+    const rows = [...locs].reverse().map(loc=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="font-size:20px;width:28px;text-align:center">${loc.icon}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${loc.place}</div>
+          <div style="font-size:11px;color:var(--text3)">${fmtTime(loc.time)}${loc.area?' · '+loc.area:''}</div>
+        </div>
+        ${loc.note?`<div style="font-size:11px;color:var(--purple)">💬${loc.note}</div>`:''}
+      </div>
+    `).join('');
+    return `
+      <div class="day-group">
+        <div class="day-header">
+          <span>${dateStr}</span>
+          <span class="day-stat">${locs.length}จุด · ${fmtDist(dist)}</span>
+        </div>
+        <div class="card" style="padding:4px 12px">${rows}</div>
+      </div>`;
+  }).join('');
+}
+
+function calcDistForLocs(locs){
+  if(locs.length<2) return 0;
+  let d=0;
+  for(let i=1;i<locs.length;i++) d+=haversine(locs[i-1].lat,locs[i-1].lon,locs[i].lat,locs[i].lon);
+  return d;
+}
+
+function clearAllHistory(){
+  if(!confirm('ลบประวัติทั้งหมดใช่ไหม?')) return;
+  saveStorage({ history:{} });
+  state.locations=[];
+  renderTimeline(); updateStats(); renderHistory();
+  showToast('🗑️ ล้างข้อมูลทั้งหมดแล้ว');
+}
+
+// ─────────────────────────────────────────
+// EXPORT EXCEL
+// ─────────────────────────────────────────
+function exportExcel(range){
+  const db = loadStorage();
+  const history = db.history||{};
+  let allLocs = [];
+  const today = todayKey();
+
+  if(range==='today'){
+    allLocs = (history[today]||[]).map(l=>({...l,_date:today}));
+  } else if(range==='week'){
+    const keys = Object.keys(history).sort().reverse().slice(0,7);
+    keys.forEach(k=>{ (history[k]||[]).forEach(l=>allLocs.push({...l,_date:k})); });
+  } else {
+    Object.keys(history).sort().reverse().forEach(k=>{ (history[k]||[]).forEach(l=>allLocs.push({...l,_date:k})); });
+  }
+
+  if(!allLocs.length){ showToast('⚠️ ไม่มีข้อมูล'); return; }
+
+  const rows = allLocs.map((loc,i) => ({
+    'ลำดับ': i+1,
+    'วันที่': fmtDateShort(loc._date+'T00:00:00'),
+    'เวลา': fmtTime(loc.time),
+    'สถานที่': loc.place,
+    'ย่าน/เขต': loc.area||'',
+    'ที่อยู่เต็ม': loc.fullAddress||'',
+    'หมายเหตุ': loc.note||'',
+    'เวลาอยู่': loc.duration!=null?fmtDuration(loc.duration):'',
+    'ละติจูด': parseFloat((loc.lat||0).toFixed(6)),
+    'ลองจิจูด': parseFloat((loc.lon||0).toFixed(6)),
+    'ความแม่นยำ(ม.)': Math.round(loc.accuracy||0),
+    'Google Maps': `https://maps.google.com/?q=${loc.lat},${loc.lon}`,
+    'บันทึกอัตโนมัติ': loc.isAuto?'ใช่':'ไม่',
+  }));
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{wch:6},{wch:16},{wch:8},{wch:30},{wch:24},{wch:50},{wch:20},{wch:12},{wch:12},{wch:12},{wch:14},{wch:50},{wch:14}];
+  XLSX.utils.book_append_sheet(wb, ws, 'บันทึก GPS');
+
+  // Summary sheet
+  const days = [...new Set(allLocs.map(l=>l._date))];
+  const summary = days.map(d=>{
+    const ls = allLocs.filter(l=>l._date===d);
+    return { 'วันที่':fmtDateShort(d+'T00:00:00'), 'จำนวนจุด':ls.length, 'สถานที่ไม่ซ้ำ':new Set(ls.map(l=>l.place)).size, 'ระยะทาง':fmtDist(calcDistForLocs(ls)) };
+  });
+  const ws2 = XLSX.utils.json_to_sheet(summary);
+  ws2['!cols'] = [{wch:18},{wch:12},{wch:14},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'สรุปรายวัน');
+
+  const label = range==='today'?'วันนี้':range==='week'?'7วัน':'ทั้งหมด';
+  XLSX.writeFile(wb, `GPS_Tracker_${label}_${today}.xlsx`);
+  showToast('✅ ดาวน์โหลด Excel แล้ว');
+}
+
+// ─────────────────────────────────────────
+// TABS
+// ─────────────────────────────────────────
+function switchTab(name, btnEl){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  btnEl.classList.add('active');
+
+  if(name==='map') renderMap();
+  if(name==='history') renderHistory();
+}
+
+// ─────────────────────────────────────────
+// PHOTO
+// ─────────────────────────────────────────
+function handlePhoto(input){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const maxW = 800;
+      const scale = Math.min(1, maxW/img.width);
+      canvas.width = img.width*scale;
+      canvas.height = img.height*scale;
+      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+      state.pendingPhoto = canvas.toDataURL('image/jpeg',0.7);
+      const prev = document.getElementById('photo-preview');
+      prev.src = state.pendingPhoto;
+      prev.style.display='block';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function setNote(text){
+  document.getElementById('note-input').value=text;
+}
+
+// ─────────────────────────────────────────
+// PWA SERVICE WORKER
+// ─────────────────────────────────────────
+if('serviceWorker' in navigator){
+  const swCode = `
+const CACHE='gps-v1';
+const FILES=['./'];
+self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES))));
+self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));
+  `;
+  const blob = new Blob([swCode],{type:'application/javascript'});
+  const url = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(url).catch(()=>{});
+}
+
+// ─────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────
+loadToday();
+renderTimeline();
+updateStats();
+
+// Keep screen awake if supported
+if(navigator.wakeLock){ navigator.wakeLock.request('screen').catch(()=>{}); }
+
+// Visibility change: resume GPS
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden && state.tracking && state.watchId==null){
+    state.watchId = navigator.geolocation.watchPosition(onGpsSuccess,onGpsError,{enableHighAccuracy:true,maximumAge:15000,timeout:20000});
+    showToast('🛰️ GPS กลับมาแล้ว');
+  }
+});
+</script>
+</body>
+</html>
